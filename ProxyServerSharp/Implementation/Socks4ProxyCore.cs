@@ -14,14 +14,15 @@ namespace ProxyServerSharp.Implementation
 
         private Socket _serverSocket;
 
+        private bool _running;
         private Thread _acceptThread;
         private List<ConnectionInfo> _connections =
             new List<ConnectionInfo>();
 
-        public Socks4ProxyCore(int port, int transferUnitSize) 
+        public Socks4ProxyCore(IProxyServerConfiguration configuration) 
         { 
-            _port = port;
-            _transferUnitSize = transferUnitSize;
+            _port = configuration.Port;
+            _transferUnitSize = configuration.TransferUnitSize;
         }
 
         public event LocalConnectEventHandler LocalConnect;
@@ -37,6 +38,8 @@ namespace ProxyServerSharp.Implementation
         {
             SetupServerSocket();
 
+            _running = true;
+
             _acceptThread = new Thread(AcceptConnections);
             _acceptThread.IsBackground = true;
             _acceptThread.Start();
@@ -44,7 +47,14 @@ namespace ProxyServerSharp.Implementation
 
         public void Shutdown()
         {
-            throw new NotImplementedException();
+            _running = false;
+            foreach(ConnectionInfo connection in _connections)
+            {
+                connection.LocalSocket.Shutdown(SocketShutdown.Both);
+                connection.LocalSocket.Close();
+                connection.RemoteSocket.Shutdown(SocketShutdown.Both);
+                connection.RemoteSocket.Close();
+            }
         }
 
         private void SetupServerSocket()
@@ -61,12 +71,17 @@ namespace ProxyServerSharp.Implementation
 
         private void AcceptConnections()
         {
-            while (true)
+            while (_running)
             {
                 // Accept a connection
                 ConnectionInfo connection = new ConnectionInfo();
 
                 Socket socket = _serverSocket.Accept();
+
+                if(_running == false)
+                {
+                    break;
+                }
 
                 connection.LocalSocket = socket;
                 connection.RemoteSocket = new Socket(AddressFamily.InterNetwork,
@@ -164,7 +179,6 @@ namespace ProxyServerSharp.Implementation
             }
             finally
             {
-                Console.WriteLine("ProcessLocalConnection Cleaning up...");
                 connection.LocalSocket.Close();
                 connection.RemoteSocket.Close();
                 lock (_connections) _connections.Remove(connection);

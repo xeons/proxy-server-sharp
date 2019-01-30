@@ -40,9 +40,9 @@
             // 
             // startProxyButton
             // 
-            this.startProxyButton.Location = new System.Drawing.Point(448, 168);
+            this.startProxyButton.Location = new System.Drawing.Point(615, 441);
             this.startProxyButton.Name = "startProxyButton";
-            this.startProxyButton.Size = new System.Drawing.Size(64, 24);
+            this.startProxyButton.Size = new System.Drawing.Size(90, 24);
             this.startProxyButton.TabIndex = 0;
             this.startProxyButton.Text = "Start";
             this.startProxyButton.UseVisualStyleBackColor = true;
@@ -72,13 +72,13 @@
             this.debugTextBox.Multiline = true;
             this.debugTextBox.Name = "debugTextBox";
             this.debugTextBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.debugTextBox.Size = new System.Drawing.Size(504, 128);
+            this.debugTextBox.Size = new System.Drawing.Size(697, 403);
             this.debugTextBox.TabIndex = 3;
             // 
             // transferUnitSizeLabel
             // 
             this.transferUnitSizeLabel.AutoSize = true;
-            this.transferUnitSizeLabel.Location = new System.Drawing.Point(8, 172);
+            this.transferUnitSizeLabel.Location = new System.Drawing.Point(12, 445);
             this.transferUnitSizeLabel.Name = "transferUnitSizeLabel";
             this.transferUnitSizeLabel.Size = new System.Drawing.Size(128, 13);
             this.transferUnitSizeLabel.TabIndex = 4;
@@ -87,7 +87,7 @@
             // transferUnitSizeComboBox
             // 
             this.transferUnitSizeComboBox.FormattingEnabled = true;
-            this.transferUnitSizeComboBox.Location = new System.Drawing.Point(144, 168);
+            this.transferUnitSizeComboBox.Location = new System.Drawing.Point(148, 441);
             this.transferUnitSizeComboBox.Name = "transferUnitSizeComboBox";
             this.transferUnitSizeComboBox.Size = new System.Drawing.Size(120, 21);
             this.transferUnitSizeComboBox.TabIndex = 5;
@@ -95,7 +95,7 @@
             // portLabel
             // 
             this.portLabel.AutoSize = true;
-            this.portLabel.Location = new System.Drawing.Point(8, 196);
+            this.portLabel.Location = new System.Drawing.Point(12, 469);
             this.portLabel.Name = "portLabel";
             this.portLabel.Size = new System.Drawing.Size(29, 13);
             this.portLabel.TabIndex = 6;
@@ -103,18 +103,17 @@
             // 
             // portTextBox
             // 
-            this.portTextBox.Location = new System.Drawing.Point(144, 192);
+            this.portTextBox.Location = new System.Drawing.Point(148, 465);
             this.portTextBox.Name = "portTextBox";
-            this.portTextBox.Size = new System.Drawing.Size(72, 20);
+            this.portTextBox.Size = new System.Drawing.Size(54, 20);
             this.portTextBox.TabIndex = 7;
             this.portTextBox.Text = "1080";
-            this.portTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(537, 222);
+            this.ClientSize = new System.Drawing.Size(717, 494);
             this.Controls.Add(this.portTextBox);
             this.Controls.Add(this.portLabel);
             this.Controls.Add(this.transferUnitSizeComboBox);
@@ -125,7 +124,7 @@
             this.Controls.Add(this.startProxyButton);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Name = "MainForm";
-            this.Text = "SOCKS4 Server ";
+            this.Text = "Multi Proxy Server";
             this.Load += new System.EventHandler(this.Form1_Load);
             this.ResumeLayout(false);
             this.PerformLayout();

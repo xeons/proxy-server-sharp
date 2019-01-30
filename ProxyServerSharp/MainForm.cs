@@ -12,7 +12,7 @@ namespace ProxyServerSharp
 {
     public partial class MainForm : Form
     {
-        Socks4ProxyCore _proxyCore;
+        IProxyCore _proxyCore;
 
         public MainForm()
         {
@@ -53,17 +53,26 @@ namespace ProxyServerSharp
         {
             if (startProxyButton.Text == "Start")
             {
-                _proxyCore = new Socks4ProxyCore(int.Parse(portTextBox.Text),
-                    int.Parse((string)transferUnitSizeComboBox.SelectedItem));
+                var config = new ProxyServerConfiguration()
+                {
+                    Port = int.Parse(portTextBox.Text),
+                    TransferUnitSize = int.Parse((string)transferUnitSizeComboBox.SelectedItem)
+                };
+
+                _proxyCore = ProxyCoreFactory.Create(config, Enums.ProxyType.Socks4);
                 _proxyCore.LocalConnect += new LocalConnectEventHandler(server_LocalConnect);
                 _proxyCore.RemoteConnect += new RemoteConnectEventHandler(server_RemoteConnect);
                 _proxyCore.Start();
+
                 statusLabel.Text = "Started";
                 startProxyButton.Text = "Stop";
             }
             else
             {
-                //
+                _proxyCore.Shutdown();
+
+                statusLabel.Text = "Stopped";
+                startProxyButton.Text = "Start";
             }
         }
     }

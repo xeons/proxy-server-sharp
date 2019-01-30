@@ -47,8 +47,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Enums\AuthenticationType.cs" />
     <Compile Include="Implementation\ConnectionInfo.cs" />
+    <Compile Include="Implementation\ProxyCoreFactory.cs" />
+    <Compile Include="Enums\ProxyType.cs" />
+    <Compile Include="Implementation\ProxyServerConfiguration.cs" />
+    <Compile Include="Implementation\SettingsProxyServerConfiguration.cs" />
+    <Compile Include="Implementation\Socks5ProxyCore.cs" />
     <Compile Include="Interfaces\IProxyCore.cs" />
+    <Compile Include="Interfaces\IProxyServerConfiguration.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
