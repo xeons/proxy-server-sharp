@@ -1,40 +1,37 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Threading;
-using System.Net.Sockets;
 using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+using ProxyServerSharp.Interfaces;
 
-namespace ProxyServerSharp
+namespace ProxyServerSharp.Implementation
 {
-    class ConnectionInfo
+    class Socks4ProxyCore: IProxyCore
     {
-        public Socket LocalSocket;
-        public Thread LocalThread;
-        public Socket RemoteSocket;
-        public Thread RemoteThread;
-    }
+        private readonly int _port;
+        private readonly int _transferUnitSize;
 
-    public delegate void ConnectEventHandler(object sender, IPEndPoint iep);
-    public delegate void ConnectionLogHandler(object sender, int code, string message);
-
-    class SOCKS4Server
-    {
         private Socket _serverSocket;
-        private int _port;
-        private int _transferUnitSize;
+
         private Thread _acceptThread;
         private List<ConnectionInfo> _connections =
             new List<ConnectionInfo>();
 
-        public event ConnectEventHandler LocalConnect;
-        public event ConnectEventHandler RemoteConnect;
-
-        public SOCKS4Server(int port, int transferUnitSize) 
+        public Socks4ProxyCore(int port, int transferUnitSize) 
         { 
             _port = port;
             _transferUnitSize = transferUnitSize;
         }
+
+        public event LocalConnectEventHandler LocalConnect;
+        public event LocalDisconnectEventHandler LocalDisconnect;
+        public event LocalSentEventHandler LocalSent;
+        public event LocalReceiveEventHandler LocalReceive;
+        public event RemoteConnectEventHandler RemoteConnect;
+        public event RemoteDisconnectEventHandler RemoteDisconnect;
+        public event RemoteSendEventHandler RemoteSend;
+        public event RemoteReceivedEventHandler RemoteReceive;
 
         public void Start()
         {
@@ -43,6 +40,11 @@ namespace ProxyServerSharp
             _acceptThread = new Thread(AcceptConnections);
             _acceptThread.IsBackground = true;
             _acceptThread.Start();
+        }
+
+        public void Shutdown()
+        {
+            throw new NotImplementedException();
         }
 
         private void SetupServerSocket()
@@ -75,8 +77,7 @@ namespace ProxyServerSharp
                 connection.LocalThread.IsBackground = true;
                 connection.LocalThread.Start(connection);
 
-                if (LocalConnect != null)
-                    LocalConnect(this, (IPEndPoint)socket.RemoteEndPoint);
+                LocalConnect?.Invoke(this, (IPEndPoint)socket.RemoteEndPoint);
 
                 // Store the socket
                 lock (_connections) _connections.Add(connection);
@@ -114,8 +115,7 @@ namespace ProxyServerSharp
                         {
                             Console.WriteLine("Connected to remote!");
 
-                            if (RemoteConnect != null)
-                                RemoteConnect(this, remoteEndPoint);
+                            RemoteConnect?.Invoke(this, remoteEndPoint);
 
                             byte[] socksResponse = new byte[] {
                                 0x00, 0x5a,

@@ -5,12 +5,14 @@ using System.Data;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
+using ProxyServerSharp.Implementation;
+using ProxyServerSharp.Interfaces;
 
 namespace ProxyServerSharp
 {
     public partial class MainForm : Form
     {
-        SOCKS4Server server;
+        Socks4ProxyCore _proxyCore;
 
         public MainForm()
         {
@@ -51,11 +53,11 @@ namespace ProxyServerSharp
         {
             if (startProxyButton.Text == "Start")
             {
-                server = new SOCKS4Server(int.Parse(portTextBox.Text),
+                _proxyCore = new Socks4ProxyCore(int.Parse(portTextBox.Text),
                     int.Parse((string)transferUnitSizeComboBox.SelectedItem));
-                server.LocalConnect += new ConnectEventHandler(server_LocalConnect);
-                server.RemoteConnect += new ConnectEventHandler(server_RemoteConnect);
-                server.Start();
+                _proxyCore.LocalConnect += new LocalConnectEventHandler(server_LocalConnect);
+                _proxyCore.RemoteConnect += new RemoteConnectEventHandler(server_RemoteConnect);
+                _proxyCore.Start();
                 statusLabel.Text = "Started";
                 startProxyButton.Text = "Stop";
             }
