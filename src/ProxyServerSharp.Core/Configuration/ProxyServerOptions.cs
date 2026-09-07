@@ -39,6 +39,12 @@ public sealed class ProxyServerOptions
     /// <summary>Whether destination host names are resolved to IPv6 as well as IPv4.</summary>
     public bool EnableIPv6 { get; set; } = true;
 
+    /// <summary>
+    /// The largest request body buffered for Digest <c>qop=auth-int</c>. A larger body is
+    /// refused rather than held in memory.
+    /// </summary>
+    public int MaxBufferedRequestBody { get; set; } = 256 * 1024;
+
     /// <summary>How long a Digest nonce stays valid before the client must re-handshake.</summary>
     public TimeSpan DigestNonceLifetime { get; set; } = TimeSpan.FromMinutes(5);
 }

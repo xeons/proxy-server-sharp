@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using ProxyServerSharp.Authentication;
@@ -24,6 +25,8 @@ public sealed class Socks4ProxyHandler : IProxyProtocolHandler
 {
     private const int MaxUserIdLength = 255;
     private const int MaxHostNameLength = 255;
+    private const byte CommandConnect = 0x01;
+    private const byte CommandBind = 0x02;
 
     private readonly Socks4Authenticator _authenticator;
 
@@ -100,10 +103,25 @@ public sealed class Socks4ProxyHandler : IProxyProtocolHandler
 
         context.SetIdentity(authentication.Identity!);
 
-        if (command != (byte)Socks5Command.Connect)
+        if (command == CommandBind)
         {
-            // BIND is the only other SOCKS4 command, and this server does not offer it;
-            // SOCKS5 listeners can be configured for BIND instead.
+            if (!context.Listener.AllowBind)
+            {
+                context.Logger.LogWarning(
+                    "Connection #{Id} requested SOCKS4 BIND, which this listener does not offer.",
+                    context.Connection.Id);
+
+                await ReplyAsync(client, Socks4Reply.Rejected, rawAddress, port, cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            await BindAsync(context, destination, rawAddress, port, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (command != CommandConnect)
+        {
             context.Logger.LogWarning(
                 "Connection #{Id} requested unsupported SOCKS4 command 0x{Command:X2}.",
                 context.Connection.Id,
@@ -155,6 +173,116 @@ public sealed class Socks4ProxyHandler : IProxyProtocolHandler
                     context.CreateRelayOptions(),
                     context.ClientSocket,
                     remote.Socket,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// The SOCKS4 <c>BIND</c> command: listen for one inbound connection on the client's behalf.
+    /// </summary>
+    /// <remarks>
+    /// Two replies are sent. The first carries the address and port the peer should connect to;
+    /// the second, once someone does, carries that peer's address. The address the client named
+    /// in the request is the peer it expects, and anyone else is refused, so a bind port cannot
+    /// be taken over by whoever connects first.
+    /// </remarks>
+    private static async Task BindAsync(
+        ProxyConnectionContext context,
+        ProxyDestination expectedPeer,
+        byte[] rawAddress,
+        int requestedPort,
+        CancellationToken cancellationToken)
+    {
+        Stream client = context.ClientStream;
+        IPAddress bindAddress = context.ClientSocket.LocalEndPoint is IPEndPoint local
+            ? local.Address
+            : IPAddress.Loopback;
+
+        // A SOCKS4 reply can only carry an IPv4 address, so BIND is IPv4 only.
+        if (bindAddress.AddressFamily != AddressFamily.InterNetwork)
+        {
+            context.Logger.LogWarning(
+                "Connection #{Id} requested SOCKS4 BIND on {Address}, which is not IPv4.",
+                context.Connection.Id,
+                bindAddress);
+
+            await ReplyAsync(client, Socks4Reply.Rejected, rawAddress, requestedPort, cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        using Socket listener = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(bindAddress, 0));
+        listener.Listen(1);
+
+        IPEndPoint bound = (IPEndPoint)listener.LocalEndPoint!;
+
+        await ReplyAsync(client, Socks4Reply.Granted, bound.Address.GetAddressBytes(), bound.Port, cancellationToken)
+            .ConfigureAwait(false);
+
+        context.Logger.LogInformation(
+            "Connection #{Id} {Identity} listening on {Bound} for an inbound connection from {Peer}",
+            context.Connection.Id,
+            context.Connection.Identity,
+            bound,
+            expectedPeer);
+
+        using CancellationTokenSource bindTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        bindTimeout.CancelAfter(context.Options.BindTimeout);
+
+        Socket inbound;
+        try
+        {
+            inbound = await listener.AcceptAsync(bindTimeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            context.Logger.LogInformation(
+                "Connection #{Id} SOCKS4 BIND timed out after {Timeout}.",
+                context.Connection.Id,
+                context.Options.BindTimeout);
+
+            await ReplyAsync(client, Socks4Reply.Rejected, rawAddress, requestedPort, cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        using (inbound)
+        {
+            IPEndPoint peer = (IPEndPoint)inbound.RemoteEndPoint!;
+
+            if (!expectedPeer.RequiresResolution
+                && !expectedPeer.Address.Equals(IPAddress.Any)
+                && !expectedPeer.Address.Equals(peer.Address))
+            {
+                context.Logger.LogWarning(
+                    "Connection #{Id} SOCKS4 BIND refused {Actual}; the client expected {Expected}.",
+                    context.Connection.Id,
+                    peer.Address,
+                    expectedPeer.Address);
+
+                await ReplyAsync(client, Socks4Reply.Rejected, rawAddress, requestedPort, cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            byte[] peerAddress = peer.AddressFamily == AddressFamily.InterNetwork
+                ? peer.Address.GetAddressBytes()
+                : rawAddress;
+
+            await ReplyAsync(client, Socks4Reply.Granted, peerAddress, peer.Port, cancellationToken)
+                .ConfigureAwait(false);
+
+            context.Connection.State = ProxyConnectionState.Relaying;
+            await using NetworkStream inboundStream = new(inbound, ownsSocket: false);
+
+            await TunnelRelay.RunAsync(
+                    client,
+                    inboundStream,
+                    context.CreateRelayOptions(),
+                    context.ClientSocket,
+                    inbound,
                     cancellationToken)
                 .ConfigureAwait(false);
         }

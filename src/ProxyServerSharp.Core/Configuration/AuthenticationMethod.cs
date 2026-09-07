@@ -15,6 +15,9 @@ public enum AuthenticationMethod
     /// <summary>SOCKS5 username/password sub-negotiation (RFC 1929).</summary>
     UsernamePassword,
 
+    /// <summary>SOCKS5 GSS-API authentication (RFC 1961), backed by the host's SSPI or GSSAPI stack.</summary>
+    Gssapi,
+
     /// <summary>HTTP <c>Basic</c> proxy authentication (RFC 7617).</summary>
     Basic,
 
@@ -35,7 +38,9 @@ public static class AuthenticationMethodExtensions
     public static bool IsValidFor(this AuthenticationMethod method, ProxyProtocol protocol) => protocol switch
     {
         ProxyProtocol.Socks4 => method is AuthenticationMethod.Anonymous or AuthenticationMethod.UserId,
-        ProxyProtocol.Socks5 => method is AuthenticationMethod.Anonymous or AuthenticationMethod.UsernamePassword,
+        ProxyProtocol.Socks5 => method is AuthenticationMethod.Anonymous
+            or AuthenticationMethod.UsernamePassword
+            or AuthenticationMethod.Gssapi,
         ProxyProtocol.Http => method is AuthenticationMethod.Anonymous
             or AuthenticationMethod.Basic
             or AuthenticationMethod.Digest
@@ -48,7 +53,12 @@ public static class AuthenticationMethodExtensions
     public static IReadOnlyList<AuthenticationMethod> SupportedBy(ProxyProtocol protocol) => protocol switch
     {
         ProxyProtocol.Socks4 => [AuthenticationMethod.UserId, AuthenticationMethod.Anonymous],
-        ProxyProtocol.Socks5 => [AuthenticationMethod.UsernamePassword, AuthenticationMethod.Anonymous],
+        ProxyProtocol.Socks5 =>
+        [
+            AuthenticationMethod.Gssapi,
+            AuthenticationMethod.UsernamePassword,
+            AuthenticationMethod.Anonymous,
+        ],
         ProxyProtocol.Http =>
         [
             AuthenticationMethod.Negotiate,

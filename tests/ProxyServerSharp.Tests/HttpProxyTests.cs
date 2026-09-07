@@ -42,7 +42,9 @@ public sealed class HttpProxyTests
         Assert.DoesNotContain("Proxy-Authorization", request, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Proxy-Connection", request, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Via:", request, StringComparison.Ordinal);
-        Assert.Contains("Connection: close", request, StringComparison.Ordinal);
+
+        // The upstream connection is now persistent, so the proxy no longer forces it closed.
+        Assert.Contains("Connection: keep-alive", request, StringComparison.Ordinal);
     }
 
     [Fact]

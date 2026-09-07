@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ProxyServerSharp.Authentication.Socks;
 
 namespace ProxyServerSharp.Configuration;
 
@@ -41,6 +42,13 @@ public sealed class ListenerOptions
     /// </summary>
     public IList<string> DigestAlgorithms { get; init; } = [];
 
+    /// <summary>
+    /// Whether HTTP Digest offers <c>qop=auth-int</c>, whose response hash covers the request
+    /// body. Off by default: verifying it means buffering the body of an as-yet unauthenticated
+    /// request, and essentially no client implements it.
+    /// </summary>
+    public bool AllowDigestAuthInt { get; set; }
+
     /// <summary>Which client addresses may connect at all.</summary>
     public AccessControlOptions Access { get; init; } = new();
 
@@ -50,7 +58,15 @@ public sealed class ListenerOptions
     /// <summary>Server-side TLS, turning an HTTP listener into an HTTPS proxy.</summary>
     public TlsOptions Tls { get; init; } = new();
 
-    /// <summary>Whether the SOCKS5 <c>BIND</c> command is honoured. Off by default.</summary>
+    /// <summary>
+    /// The strongest per-message protection a SOCKS5 GSSAPI client may negotiate (RFC 1961 §4.3).
+    /// The client proposes a level and the server lowers it to this cap;
+    /// <c>None</c> authenticates with GSSAPI but leaves the relayed traffic unencapsulated,
+    /// which is what most clients ask for.
+    /// </summary>
+    public GssapiProtectionLevel GssapiProtection { get; set; } = GssapiProtectionLevel.Confidentiality;
+
+    /// <summary>Whether the SOCKS4 and SOCKS5 <c>BIND</c> command is honoured. Off by default.</summary>
     public bool AllowBind { get; set; }
 
     /// <summary>Whether the SOCKS5 <c>UDP ASSOCIATE</c> command is honoured. Off by default.</summary>

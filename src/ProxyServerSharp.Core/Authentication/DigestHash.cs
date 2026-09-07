@@ -67,6 +67,21 @@ public static class DigestHash
         return Convert.ToHexStringLower(digest);
     }
 
+    /// <summary>Hashes raw bytes with <paramref name="algorithm"/>, returning lowercase hex.</summary>
+    /// <remarks>Used by <c>qop=auth-int</c>, which hashes the entity body rather than text.</remarks>
+    public static string ComputeBytes(string algorithm, ReadOnlySpan<byte> value)
+    {
+        byte[] digest = algorithm switch
+        {
+            Sha256 => SHA256.HashData(value),
+            Sha512Trunc256 => SHA512.HashData(value)[..32],
+            Md5 => MD5.HashData(value),
+            _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm, "Unsupported digest algorithm."),
+        };
+
+        return Convert.ToHexStringLower(digest);
+    }
+
     /// <summary>Computes <c>HA1 = H(username:realm:password)</c>.</summary>
     public static string ComputeHa1(string algorithm, string username, string realm, string password) =>
         Compute(algorithm, $"{username}:{realm}:{password}");

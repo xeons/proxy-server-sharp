@@ -28,6 +28,13 @@ switch (command.Verb)
         return 2;
 }
 
+// A --config path the user typed is worth a clear message rather than a stack trace.
+if (command.ConfigPath is { } configPath && !File.Exists(configPath))
+{
+    Console.Error.WriteLine($"Configuration file not found: {Path.GetFullPath(configPath)}");
+    return 2;
+}
+
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
     Args = args,

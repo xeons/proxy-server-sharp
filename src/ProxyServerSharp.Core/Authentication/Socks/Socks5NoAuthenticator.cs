@@ -15,9 +15,9 @@ public sealed class Socks5NoAuthenticator : ISocks5Authenticator
     public byte MethodCode => Code;
 
     /// <inheritdoc />
-    public ValueTask<AuthenticationResult> AuthenticateAsync(
+    public ValueTask<Socks5AuthenticationOutcome> AuthenticateAsync(
         Stream stream,
         UserStoreContext context,
         CancellationToken cancellationToken) =>
-        ValueTask.FromResult(AuthenticationResult.Success(ProxyIdentity.Anonymous));
+        ValueTask.FromResult(Socks5AuthenticationOutcome.Success(ProxyIdentity.Anonymous));
 }

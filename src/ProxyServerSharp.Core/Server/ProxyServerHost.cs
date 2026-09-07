@@ -105,7 +105,7 @@ public sealed class ProxyServerHost : IAsyncDisposable
         _shutdown = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         DigestNonceManager nonces = new(_options.DigestNonceLifetime);
-        ProxyHandlerFactory factory = new(_users, nonces);
+        ProxyHandlerFactory factory = new(_users, nonces, _loggerFactory);
 
         foreach (ListenerOptions options in enabled)
         {

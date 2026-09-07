@@ -70,6 +70,56 @@ internal sealed class SocksClient : IAsyncDisposable
         return reply[1];
     }
 
+    /// <summary>
+    /// Sends a SOCKS5 request over an arbitrary stream, so a GSSAPI-encapsulated conversation can
+    /// reuse the same wire format.
+    /// </summary>
+    internal static async Task<(byte Reply, IPEndPoint Bound)> RequestOverAsync(
+        Stream stream,
+        byte command,
+        IPEndPoint destination)
+    {
+        byte[] request = new byte[10];
+        request[0] = 0x05;
+        request[1] = command;
+        request[2] = 0x00;
+        request[3] = 0x01;
+        destination.Address.GetAddressBytes().CopyTo(request, 4);
+        BinaryPrimitives.WriteUInt16BigEndian(request.AsSpan(8), (ushort)destination.Port);
+
+        await stream.WriteAsync(request);
+        await stream.FlushAsync();
+        return await ReadReplyOverAsync(stream);
+    }
+
+    /// <summary>Reads one SOCKS5 reply from an arbitrary stream.</summary>
+    internal static async Task<(byte Reply, IPEndPoint Bound)> ReadReplyOverAsync(Stream stream)
+    {
+        byte[] header = new byte[4];
+        await stream.ReadExactlyAsync(header);
+
+        Assert.Equal(0x05, header[0]);
+
+        int addressLength;
+        if (header[3] == 0x03)
+        {
+            byte[] length = new byte[1];
+            await stream.ReadExactlyAsync(length);
+            addressLength = length[0];
+        }
+        else
+        {
+            addressLength = header[3] == 0x04 ? 16 : 4;
+        }
+
+        byte[] rest = new byte[addressLength + 2];
+        await stream.ReadExactlyAsync(rest);
+
+        IPAddress address = header[3] == 0x03 ? IPAddress.Any : new IPAddress(rest.AsSpan(0, addressLength));
+        int port = BinaryPrimitives.ReadUInt16BigEndian(rest.AsSpan(addressLength));
+        return (header[1], new IPEndPoint(address, port));
+    }
+
     /// <summary>Sends a SOCKS5 request and returns the reply code plus the bound endpoint.</summary>
     internal async Task<(byte Reply, IPEndPoint Bound)> RequestAsync(byte command, IPEndPoint destination)
     {

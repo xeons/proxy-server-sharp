@@ -22,6 +22,7 @@ public sealed class DigestHttpAuthenticator : IHttpProxyAuthenticator, IHttpProx
     private readonly IUserStore _users;
     private readonly DigestNonceManager _nonces;
     private readonly string[] _algorithms;
+    private readonly bool _allowAuthInt;
 
     /// <summary>Creates the scheme.</summary>
     /// <param name="users">The account directory.</param>
@@ -32,7 +33,15 @@ public sealed class DigestHttpAuthenticator : IHttpProxyAuthenticator, IHttpProx
     /// offers SHA-256 and then MD5 — several mainstream clients, including anything using the
     /// Windows SSPI digest package, still only understand MD5.
     /// </param>
-    public DigestHttpAuthenticator(IUserStore users, DigestNonceManager nonces, IEnumerable<string>? algorithms = null)
+    /// <param name="allowAuthInt">
+    /// Whether <c>qop=auth-int</c> is offered. It requires buffering the request body before the
+    /// credential can be checked, so it is off unless asked for.
+    /// </param>
+    public DigestHttpAuthenticator(
+        IUserStore users,
+        DigestNonceManager nonces,
+        IEnumerable<string>? algorithms = null,
+        bool allowAuthInt = false)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(nonces);
@@ -42,6 +51,8 @@ public sealed class DigestHttpAuthenticator : IHttpProxyAuthenticator, IHttpProx
         _algorithms = algorithms is null
             ? [DigestHash.Sha256, DigestHash.Md5]
             : [.. algorithms.Select(Normalize).Distinct(StringComparer.Ordinal)];
+
+        _allowAuthInt = allowAuthInt;
 
         if (_algorithms.Length == 0)
         {
@@ -119,7 +130,32 @@ public sealed class DigestHttpAuthenticator : IHttpProxyAuthenticator, IHttpProx
             ha1 = DigestHash.Compute(algorithm, $"{ha1}:{nonce}:{cnonce}");
         }
 
-        string ha2 = DigestHash.Compute(algorithm, $"{context.Method}:{uri}");
+        // RFC 7616 §3.4.3: auth-int folds a hash of the entity body into A2.
+        string ha2;
+        if (string.Equals(qop, "auth-int", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!_allowAuthInt)
+            {
+                return Reject("Digest qop=auth-int is not enabled on this listener.", context, stale: false);
+            }
+
+            if (context.EntityBody is null)
+            {
+                return Reject("Digest qop=auth-int is unavailable for this request.", context, stale: false);
+            }
+
+            byte[]? body = await context.EntityBody(cancellationToken).ConfigureAwait(false);
+            if (body is null)
+            {
+                return Reject("The request body was too large to verify with qop=auth-int.", context, stale: false);
+            }
+
+            ha2 = DigestHash.Compute(algorithm, $"{context.Method}:{uri}:{DigestHash.ComputeBytes(algorithm, body)}");
+        }
+        else
+        {
+            ha2 = DigestHash.Compute(algorithm, $"{context.Method}:{uri}");
+        }
 
         string expected;
         if (string.IsNullOrEmpty(qop))
@@ -127,19 +163,18 @@ public sealed class DigestHttpAuthenticator : IHttpProxyAuthenticator, IHttpProx
             // RFC 2069 compatibility for clients that never learned qop.
             expected = DigestHash.Compute(algorithm, $"{ha1}:{nonce}:{ha2}");
         }
-        else if (string.Equals(qop, "auth", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(qop, "auth", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(qop, "auth-int", StringComparison.OrdinalIgnoreCase))
         {
             if (cnonce is null || nc is null)
             {
-                return Reject("Digest qop=auth requires both cnonce and nc.", context, stale: false);
+                return Reject($"Digest qop={qop} requires both cnonce and nc.", context, stale: false);
             }
 
             expected = DigestHash.Compute(algorithm, $"{ha1}:{nonce}:{nc}:{cnonce}:{qop}:{ha2}");
         }
         else
         {
-            // qop=auth-int would require hashing the entity body, which this proxy streams
-            // rather than buffers.
             return Reject($"Unsupported digest qop '{qop}'.", context, stale: false);
         }
 
@@ -169,7 +204,7 @@ public sealed class DigestHttpAuthenticator : IHttpProxyAuthenticator, IHttpProx
             StringBuilder builder = new(192);
             builder.Append(Scheme)
                 .Append(" realm=").Append(HttpAuthenticationHelpers.Quote(realm))
-                .Append(", qop=\"auth\"")
+                .Append(_allowAuthInt ? ", qop=\"auth,auth-int\"" : ", qop=\"auth\"")
                 .Append(", algorithm=").Append(algorithm)
                 .Append(", nonce=").Append(HttpAuthenticationHelpers.Quote(_nonces.Create()))
                 .Append(", opaque=").Append(HttpAuthenticationHelpers.Quote(_nonces.Opaque))

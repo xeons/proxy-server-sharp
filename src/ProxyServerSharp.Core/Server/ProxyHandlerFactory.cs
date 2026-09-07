@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using ProxyServerSharp.Authentication;
 using ProxyServerSharp.Authentication.Http;
 using ProxyServerSharp.Authentication.Socks;
@@ -21,17 +23,20 @@ public sealed class ProxyHandlerFactory
 {
     private readonly IUserStore _users;
     private readonly DigestNonceManager _nonces;
+    private readonly ILoggerFactory _loggerFactory;
 
     /// <summary>Creates the factory.</summary>
     /// <param name="users">The account directory every scheme checks against.</param>
     /// <param name="nonces">The Digest nonce manager, shared so nonces survive across connections.</param>
-    public ProxyHandlerFactory(IUserStore users, DigestNonceManager nonces)
+    /// <param name="loggerFactory">Where authentication methods that log their own progress report.</param>
+    public ProxyHandlerFactory(IUserStore users, DigestNonceManager nonces, ILoggerFactory? loggerFactory = null)
     {
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(nonces);
 
         _users = users;
         _nonces = nonces;
+        _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
     }
 
     /// <summary>Builds the handler for <paramref name="listener"/>.</summary>
@@ -90,6 +95,14 @@ public sealed class ProxyHandlerFactory
 
             yield return method switch
             {
+                AuthenticationMethod.Gssapi => new Socks5GssapiAuthenticator(
+                    _users,
+
+                    // Requiring a matching account only makes sense when there are accounts to
+                    // match; otherwise any principal the OS authenticates is accepted.
+                    requireKnownAccount: !_users.IsEmpty,
+                    listener.GssapiProtection,
+                    _loggerFactory.CreateLogger<Socks5GssapiAuthenticator>()),
                 AuthenticationMethod.UsernamePassword => new Socks5UsernamePasswordAuthenticator(_users),
                 _ => new Socks5NoAuthenticator(),
             };
@@ -122,7 +135,8 @@ public sealed class ProxyHandlerFactory
                     factories.Add(new DigestHttpAuthenticator(
                         _users,
                         _nonces,
-                        listener.DigestAlgorithms.Count > 0 ? listener.DigestAlgorithms : null));
+                        listener.DigestAlgorithms.Count > 0 ? listener.DigestAlgorithms : null,
+                        listener.AllowDigestAuthInt));
                     break;
 
                 case AuthenticationMethod.Bearer:

@@ -7,6 +7,7 @@
     "MaxConnections": 512,
     "MaxConnectionsPerClient": 64,
     "EnableIPv6": true,
+    "MaxBufferedRequestBody": 262144,
 
     "Listeners": [
       {
@@ -30,7 +31,20 @@
         "Protocol": "Socks4",
         "Address": "127.0.0.1",
         "Port": 1081,
-        "Authentication": [ "UserId" ]
+        "Authentication": [ "UserId" ],
+        "AllowBind": false
+      },
+      {
+        "Name": "socks5-kerberos",
+        "Enabled": false,
+        "Protocol": "Socks5",
+        "Address": "127.0.0.1",
+        "Port": 1082,
+        "Authentication": [ "Gssapi" ],
+
+        // None authenticates with GSSAPI but leaves the relayed bytes unencapsulated;
+        // Integrity and Confidentiality wrap every subsequent message (RFC 1961 4.3).
+        "GssapiProtection": "Confidentiality"
       },
       {
         "Name": "http",
@@ -40,6 +54,8 @@
         "Port": 8080,
         "Realm": "ProxyServerSharp",
         "Authentication": [ "Digest", "Basic" ],
+        "DigestAlgorithms": [ "SHA-256", "MD5" ],
+        "AllowDigestAuthInt": false,
         "AllowPlainHttpForwarding": true
       },
       {

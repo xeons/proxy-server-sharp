@@ -11,9 +11,9 @@ headless console host and the Windows desktop app on top of it.
 
 | Protocol | Commands | Authentication |
 | --- | --- | --- |
-| SOCKS4 / SOCKS4a | `CONNECT` | Anonymous, `USERID` |
-| SOCKS5 (RFC 1928) | `CONNECT`, `BIND`, `UDP ASSOCIATE` | Anonymous (`0x00`), username/password (`0x02`, RFC 1929) |
-| HTTP / HTTPS | `CONNECT` tunnel, absolute-URI forwarding | Anonymous, Basic (RFC 7617), Digest (RFC 7616), Bearer, Negotiate/NTLM |
+| SOCKS4 / SOCKS4a | `CONNECT`, `BIND` | Anonymous, `USERID` |
+| SOCKS5 (RFC 1928) | `CONNECT`, `BIND`, `UDP ASSOCIATE` | Anonymous (`0x00`), GSSAPI (`0x01`, RFC 1961), username/password (`0x02`, RFC 1929) |
+| HTTP / HTTPS | `CONNECT` tunnel, absolute-URI forwarding, `101` upgrade | Anonymous, Basic (RFC 7617), Digest (RFC 7616, `auth` and `auth-int`), Bearer, Negotiate/NTLM |
 
 A listener offers whichever methods you configure; a client satisfying any one of them is let
 through. Where a protocol can express a preference, the **server's** order wins, not the client's.
@@ -29,6 +29,10 @@ through. Where a protocol can express a preference, the **server's** order wins,
 - **Negotiate** authenticates against the Windows login through SSPI, so there is no proxy password
   to store at all. It needs a multi-leg exchange, which this server carries across `407` round
   trips on one connection.
+- **SOCKS5 GSSAPI** (RFC 1961) is the Kerberos/NTLM option for SOCKS, and the only SOCKS method
+  that can protect the traffic itself: after the handshake it negotiates a protection level of
+  none, integrity, or integrity plus confidentiality. Client support is thin — curl implements it,
+  most SOCKS libraries and every browser do not.
 - **SOCKS5 username/password** travels in the clear, exactly as RFC 1929 specifies. Keep that
   listener on loopback or a trusted network.
 - **SOCKS4 `USERID`** is an identifier, not a secret — there is no password anywhere in SOCKS4.
@@ -61,7 +65,7 @@ The server log, at information or debug level.
 src/ProxyServerSharp.Core   net10.0          the protocol and authentication engine
 src/ProxyServerSharp.Cli    net10.0          "proxysharp", a cross-platform console host
 src/ProxyServerSharp.App    net10.0-windows  the WinForms desktop front-end
-tests/ProxyServerSharp.Tests                 129 tests over real loopback sockets
+tests/ProxyServerSharp.Tests                 157 tests over real loopback sockets
 ```
 
 ## Running it
@@ -144,15 +148,15 @@ for the other schemes.
   challenge and support only MD5 — notably anything using the Windows SSPI digest package, which
   includes curl built against Schannel. Put `"DigestAlgorithms": [ "MD5" ]` on the listener if you
   need to interoperate with those.
-- **Plain HTTP forwarding** opens a fresh upstream connection per request and forces
-  `Connection: close` in both directions, rather than reimplementing chunked and `Content-Length`
-  framing on both sides. `CONNECT`, which carries essentially all real traffic, is unaffected.
-- **SOCKS5 GSSAPI** (method `0x01`, RFC 1961) is not offered: its per-message wrapping would apply
-  to the tunnelled payload, not just the handshake. Use an HTTP listener with `Negotiate` for a
-  Windows domain login.
-- **SOCKS4 `BIND`** is not offered; configure a SOCKS5 listener with `AllowBind` instead.
-- **Negotiate** is served through SSPI on Windows and GSSAPI elsewhere; a non-Windows host needs a
-  keytab for it to work at all.
+- **Digest `qop=auth-int`** is implemented but off by default (`AllowDigestAuthInt`). Its response
+  hash covers the request body, so the body of a not-yet-authenticated request has to be buffered
+  — capped by `MaxBufferedRequestBody`, 256 KiB by default. Essentially no client implements it.
+- **GSSAPI and Negotiate** are served through SSPI on Windows and GSSAPI elsewhere; a non-Windows
+  host needs a keytab for either to work at all.
+- **SOCKS5 UDP fragmentation** is not reassembled: datagrams with a non-zero `FRAG` field are
+  dropped, which RFC 1928 §7 explicitly permits and every mainstream client already assumes.
+- **HTTP/2 and HTTP/3** are not spoken to the client. `CONNECT` tunnels carry them fine, since the
+  proxy is not looking inside; only the plain-forwarding path is HTTP/1.1.
 
 ## What changed from the original
 
@@ -169,6 +173,10 @@ Beyond finishing SOCKS5 and adding HTTP, TLS and the authentication schemes:
   global and per-client caps, and the tracker feeds the desktop app's live view.
 - **Timeouts.** Separate handshake, connect and idle timeouts, so a stalled client cannot hold a
   slot forever while a busy tunnel is never cut off mid-transfer.
+- **Persistent HTTP forwarding.** Requests are framed properly — `Content-Length`, chunked, or
+  until-close — so both the client and upstream connections stay alive across requests, interim
+  `1xx` responses are relayed, and a `101` switches the connection to a raw tunnel. Conflicting
+  `Content-Length` fields are rejected rather than guessed at, closing a request-smuggling vector.
 - **Configuration and logging** through `Microsoft.Extensions.*` instead of `Properties.Settings`
   and `Console.WriteLine`.
 

@@ -55,7 +55,7 @@ public sealed class Socks5ProxyHandler : IProxyProtocolHandler
             return;
         }
 
-        AuthenticationResult authentication = await method
+        Socks5AuthenticationOutcome authentication = await method
             .AuthenticateAsync(client, context.StoreContext, cancellationToken)
             .ConfigureAwait(false);
 
@@ -66,12 +66,34 @@ public sealed class Socks5ProxyHandler : IProxyProtocolHandler
                 context.Connection.Id,
                 context.ClientEndPoint,
                 method.Method,
-                authentication.FailureReason);
+                authentication.Result.FailureReason);
             return;
         }
 
-        context.SetIdentity(authentication.Identity!);
+        context.SetIdentity(authentication.Result.Identity!);
 
+        // GSSAPI can negotiate per-message protection, after which every SOCKS message and all
+        // relayed traffic is encapsulated. When it does, the rest of the conversation runs over
+        // the stream it installed rather than the raw connection.
+        if (authentication.ProtectedStream is { } encapsulated)
+        {
+            await using (encapsulated.ConfigureAwait(false))
+            {
+                await HandleRequestAsync(context, encapsulated, cancellationToken).ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        await HandleRequestAsync(context, client, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads and dispatches the SOCKS5 request that follows a successful handshake.</summary>
+    private static async Task HandleRequestAsync(
+        ProxyConnectionContext context,
+        Stream client,
+        CancellationToken cancellationToken)
+    {
         // VER | CMD | RSV | ATYP ...
         byte[] header = new byte[3];
         await client.ReadExactlyAsync(header, cancellationToken).ConfigureAwait(false);
@@ -91,15 +113,15 @@ public sealed class Socks5ProxyHandler : IProxyProtocolHandler
             switch (command)
             {
                 case Socks5Command.Connect:
-                    await ConnectAsync(context, destination, cancellationToken).ConfigureAwait(false);
+                    await ConnectAsync(context, client, destination, cancellationToken).ConfigureAwait(false);
                     break;
 
                 case Socks5Command.Bind when context.Listener.AllowBind:
-                    await BindAsync(context, destination, cancellationToken).ConfigureAwait(false);
+                    await BindAsync(context, client, destination, cancellationToken).ConfigureAwait(false);
                     break;
 
                 case Socks5Command.UdpAssociate when context.Listener.AllowUdpAssociate:
-                    await UdpAssociateAsync(context, destination, cancellationToken).ConfigureAwait(false);
+                    await UdpAssociateAsync(context, client, destination, cancellationToken).ConfigureAwait(false);
                     break;
 
                 default:
@@ -172,11 +194,10 @@ public sealed class Socks5ProxyHandler : IProxyProtocolHandler
 
     private static async Task ConnectAsync(
         ProxyConnectionContext context,
+        Stream client,
         ProxyDestination destination,
         CancellationToken cancellationToken)
     {
-        Stream client = context.ClientStream;
-
         RemoteConnection remote;
         try
         {
@@ -221,10 +242,10 @@ public sealed class Socks5ProxyHandler : IProxyProtocolHandler
 
     private static async Task BindAsync(
         ProxyConnectionContext context,
+        Stream client,
         ProxyDestination expectedPeer,
         CancellationToken cancellationToken)
     {
-        Stream client = context.ClientStream;
         IPAddress bindAddress = LocalAddress(context);
 
         using Socket listener = new(bindAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -302,10 +323,10 @@ public sealed class Socks5ProxyHandler : IProxyProtocolHandler
 
     private static async Task UdpAssociateAsync(
         ProxyConnectionContext context,
+        Stream client,
         ProxyDestination requestedClientEndPoint,
         CancellationToken cancellationToken)
     {
-        Stream client = context.ClientStream;
         IPAddress bindAddress = LocalAddress(context);
 
         using Socket relay = new(bindAddress.AddressFamily, SocketType.Dgram, ProtocolType.Udp);

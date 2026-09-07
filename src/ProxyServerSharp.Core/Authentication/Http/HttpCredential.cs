@@ -108,11 +108,18 @@ public sealed class HttpAuthenticationOutcome
 /// <param name="Realm">The protection space advertised by the listener.</param>
 /// <param name="Method">The HTTP method, which Digest folds into its response hash.</param>
 /// <param name="Target">The request-target, which Digest compares against its <c>uri</c> parameter.</param>
+/// <param name="EntityBody">
+/// Buffers the request body on demand, for the one scheme that needs it: Digest
+/// <c>qop=auth-int</c> hashes the body into its response. Returns <see langword="null"/> when no
+/// body is available or it exceeds the configured cap. Left unset by callers that do not support
+/// <c>auth-int</c>.
+/// </param>
 public readonly record struct HttpAuthenticationContext(
     UserStoreContext StoreContext,
     string Realm,
     string Method,
-    string Target);
+    string Target,
+    Func<CancellationToken, ValueTask<byte[]?>>? EntityBody = null);
 
 /// <summary>One HTTP proxy authentication scheme.</summary>
 public interface IHttpProxyAuthenticator

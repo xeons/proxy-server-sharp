@@ -36,7 +36,7 @@ public sealed class Socks5UsernamePasswordAuthenticator : ISocks5Authenticator
     public byte MethodCode => Code;
 
     /// <inheritdoc />
-    public async ValueTask<AuthenticationResult> AuthenticateAsync(
+    public async ValueTask<Socks5AuthenticationOutcome> AuthenticateAsync(
         Stream stream,
         UserStoreContext context,
         CancellationToken cancellationToken)
@@ -52,7 +52,7 @@ public sealed class Socks5UsernamePasswordAuthenticator : ISocks5Authenticator
         if (header[0] != SubNegotiationVersion)
         {
             await ReplyAsync(stream, StatusFailure, cancellationToken).ConfigureAwait(false);
-            return AuthenticationResult.Fail($"Unsupported RFC 1929 version 0x{header[0]:X2}.");
+            return Socks5AuthenticationOutcome.Fail($"Unsupported RFC 1929 version 0x{header[0]:X2}.");
         }
 
         string username = await ReadStringAsync(stream, header[1], cancellationToken).ConfigureAwait(false);
@@ -68,7 +68,7 @@ public sealed class Socks5UsernamePasswordAuthenticator : ISocks5Authenticator
         await ReplyAsync(stream, result.Succeeded ? StatusSuccess : StatusFailure, cancellationToken)
             .ConfigureAwait(false);
 
-        return result;
+        return Socks5AuthenticationOutcome.From(result);
     }
 
     private static async ValueTask<string> ReadStringAsync(Stream stream, byte length, CancellationToken cancellationToken)
