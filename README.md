@@ -34,6 +34,27 @@ through. Where a protocol can express a preference, the **server's** order wins,
 - **SOCKS4 `USERID`** is an identifier, not a secret — there is no password anywhere in SOCKS4.
   Treat it as a label and pair it with the address allow list.
 
+## The desktop app
+
+Listeners are edited in a grid, with the authentication methods and the per-listener settings
+beside it. Options that do not apply to the selected protocol are disabled — TLS and the Digest
+algorithms are greyed out here because a SOCKS5 listener is selected.
+
+![Listeners tab](screenshots/listeners.jpg)
+
+Accounts, with the note about why enabling Digest also keeps the password itself on disk.
+
+![Users tab](screenshots/users.jpg)
+
+Live connections, each with its destination, state and byte counters — here relaying 18
+simultaneous tunnels for a browser.
+
+![Connections tab](screenshots/connections.jpg)
+
+The server log, at information or debug level.
+
+![Log tab](screenshots/log.jpg)
+
 ## Layout
 
 ```
@@ -132,7 +153,6 @@ for the other schemes.
 - **SOCKS4 `BIND`** is not offered; configure a SOCKS5 listener with `AllowBind` instead.
 - **Negotiate** is served through SSPI on Windows and GSSAPI elsewhere; a non-Windows host needs a
   keytab for it to work at all.
-- `Screenshot.png` still shows the original WinForms UI and no longer matches the app.
 
 ## What changed from the original
 

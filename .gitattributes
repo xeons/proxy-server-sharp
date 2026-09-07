@@ -4,5 +4,6 @@
 
 # Binary assets, never diffed or converted.
 *.png binary
+*.jpg binary
 *.pfx binary
 *.snk binary
