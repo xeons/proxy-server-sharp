@@ -1,0 +1,76 @@
+{
+  "ProxyServer": {
+    "BufferSize": 32768,
+    "HandshakeTimeout": "00:00:15",
+    "ConnectTimeout": "00:00:15",
+    "IdleTimeout": "00:05:00",
+    "MaxConnections": 512,
+    "MaxConnectionsPerClient": 64,
+    "EnableIPv6": true,
+
+    "Listeners": [
+      {
+        "Name": "socks5",
+        "Enabled": true,
+        "Protocol": "Socks5",
+        "Address": "127.0.0.1",
+        "Port": 1080,
+        "Authentication": [ "UsernamePassword" ],
+        "AllowBind": false,
+        "AllowUdpAssociate": false,
+        "Destinations": {
+          "BlockLoopback": true,
+          "BlockLinkLocal": true,
+          "BlockPrivateNetworks": false
+        }
+      },
+      {
+        "Name": "socks4",
+        "Enabled": false,
+        "Protocol": "Socks4",
+        "Address": "127.0.0.1",
+        "Port": 1081,
+        "Authentication": [ "UserId" ]
+      },
+      {
+        "Name": "http",
+        "Enabled": true,
+        "Protocol": "Http",
+        "Address": "127.0.0.1",
+        "Port": 8080,
+        "Realm": "ProxyServerSharp",
+        "Authentication": [ "Digest", "Basic" ],
+        "AllowPlainHttpForwarding": true
+      },
+      {
+        "Name": "https",
+        "Enabled": false,
+        "Protocol": "Http",
+        "Address": "0.0.0.0",
+        "Port": 8443,
+        "Realm": "ProxyServerSharp",
+        "Authentication": [ "Basic", "Bearer" ],
+        "Tls": {
+          "Enabled": true,
+          "AllowSelfSigned": true,
+          "CertificatePath": null,
+          "CertificatePassword": null
+        },
+        "Access": {
+          "Allow": [ "192.168.0.0/16" ],
+          "Deny": []
+        }
+      }
+    ],
+
+    "Users": [
+      {
+        "Username": "alice",
+        "PasswordHash": "pbkdf2-sha256$600000$REPLACE_ME$REPLACE_ME",
+        "Enabled": true,
+        "Listeners": [],
+        "AllowedClients": []
+      }
+    ]
+  }
+}

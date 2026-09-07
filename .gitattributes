@@ -1,0 +1,8 @@
+# This repository is CRLF throughout: files are stored with CRLF in git and checked out
+# unchanged, so no end-of-line conversion happens in either direction on any platform.
+* -text
+
+# Binary assets, never diffed or converted.
+*.png binary
+*.pfx binary
+*.snk binary

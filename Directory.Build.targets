@@ -1,0 +1,17 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      CA5351: MD5 is required by RFC 7616 Digest and is negotiated, not chosen. It is never used
+              to store a secret; PBKDF2-HMAC-SHA256 does that.
+      CA1861: Small constant byte arrays in protocol replies read better inline than as fields.
+      CA1848: The LoggerMessage source generator targets per-request hot paths. Every call site
+              here is per-connection or slower, so the delegate ceremony would cost more in
+              readability than it saves in allocations.
+      CA1873: Structured log arguments are endpoints and enums whose formatting only happens if
+              the level is enabled; the rule cannot see that through the ILogger overloads.
+    -->
+    <NoWarn>$(NoWarn);CA5351;CA1861;CA1848;CA1873</NoWarn>
+  </PropertyGroup>
+
+</Project>

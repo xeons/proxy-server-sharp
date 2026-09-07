@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ProxyServerSharp.App/ProxyServerSharp.App.csproj" />
+    <Project Path="src/ProxyServerSharp.Cli/ProxyServerSharp.Cli.csproj" />
+    <Project Path="src/ProxyServerSharp.Core/ProxyServerSharp.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ProxyServerSharp.Tests/ProxyServerSharp.Tests.csproj" />
+  </Folder>
+</Solution>

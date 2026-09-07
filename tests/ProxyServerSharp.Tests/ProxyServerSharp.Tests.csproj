@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>ProxyServerSharp.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+
+    <!-- xunit.v3 runs on Microsoft.Testing.Platform, which the .NET 10 SDK requires opting into. -->
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+
+    <!--
+      CA1707: Subject_Behaviour test names are the convention here and read better than PascalCase.
+      xUnit1051: these tests drive real sockets whose timeouts are the point; threading a
+                 cancellation token through every call would bury what each test is asserting.
+    -->
+    <NoWarn>$(NoWarn);CA1707;xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProxyServerSharp.Core\ProxyServerSharp.Core.csproj" />
+  </ItemGroup>
+
+</Project>
